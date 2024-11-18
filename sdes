@@ -1,0 +1,101 @@
+import numpy as np
+
+# Helper Functions
+def table_shift(array, table_array):
+    """Permute bits according to a given table."""
+    return [array[i - 1] for i in table_array]
+
+def array_split(array):
+    """Split an array into two halves."""
+    mid = len(array) // 2
+    return array[:mid], array[mid:]
+
+def shifting_LtoR(array):
+    """Perform a left circular shift."""
+    return array[1:] + array[:1]
+
+# Permutation Tables
+table_p_10 = [3, 5, 2, 7, 4, 10, 1, 9, 8, 6]
+table_p_08 = [6, 3, 7, 4, 8, 5, 10, 9]
+table_ip = [2, 6, 3, 1, 4, 8, 5, 7]
+table_ip_inv = [4, 1, 3, 5, 7, 2, 8, 6]
+table_ep = [4, 1, 2, 3, 2, 3, 4, 1]
+table_p_4 = [2, 4, 3, 1]
+
+# S-Boxes
+sbox_0 = [[1, 0, 3, 2],
+          [3, 2, 1, 0],
+          [0, 2, 1, 3],
+          [3, 1, 3, 2]]
+
+sbox_1 = [[0, 1, 2, 3],
+          [2, 0, 1, 3],
+          [3, 0, 1, 0],
+          [2, 1, 0, 3]]
+
+# Key Generation
+def split_and_merge(key):
+    """Split and left-shift both halves of a key."""
+    left, right = array_split(key)
+    left_shifted = shifting_LtoR(left)
+    right_shifted = shifting_LtoR(right)
+    return left_shifted + right_shifted
+
+def key_generation(key):
+    """Generate two subkeys."""
+    permuted_key = table_shift(key, table_p_10)
+    key_1 = table_shift(split_and_merge(permuted_key), table_p_08)
+    key_2 = table_shift(split_and_merge(split_and_merge(permuted_key)), table_p_08)
+    return key_1, key_2
+
+# Feistel Function (Fk)
+def sbox_lookup(bits, sbox):
+    """Lookup bits in an S-box."""
+    row = (bits[0] << 1) + bits[3]
+    col = (bits[1] << 1) + bits[2]
+    value = sbox[row][col]
+    return [int(b) for b in f"{value:02b}"]
+
+def fk(bits, subkey):
+    """Apply the Feistel function."""
+    left, right = array_split(bits)
+    expanded_right = table_shift(right, table_ep)
+    xor_result = [a ^ b for a, b in zip(expanded_right, subkey)]
+    left_sbox = sbox_lookup(xor_result[:4], sbox_0)
+    right_sbox = sbox_lookup(xor_result[4:], sbox_1)
+    p4_result = table_shift(left_sbox + right_sbox, table_p_4)
+    new_left = [a ^ b for a, b in zip(left, p4_result)]
+    return new_left + right
+
+# Encryption and Decryption
+def sdes_encrypt(plaintext, key):
+    """Encrypt plaintext using SDES."""
+    key_1, key_2 = key_generation(key)
+    permuted = table_shift(plaintext, table_ip)
+    round1 = fk(permuted, key_1)
+    swapped = round1[4:] + round1[:4]
+    round2 = fk(swapped, key_2)
+    ciphertext = table_shift(round2, table_ip_inv)
+    return ciphertext
+
+def sdes_decrypt(ciphertext, key):
+    """Decrypt ciphertext using SDES."""
+    key_1, key_2 = key_generation(key)
+    permuted = table_shift(ciphertext, table_ip)
+    round1 = fk(permuted, key_2)
+    swapped = round1[4:] + round1[:4]
+    round2 = fk(swapped, key_1)
+    plaintext = table_shift(round2, table_ip_inv)
+    return plaintext
+
+# Example Usage
+if __name__ == "__main__":
+    # Example 10-bit key and 8-bit plaintext
+    key = [0, 0, 0, 1, 1, 0, 1, 1, 0, 1]
+    plaintext = [1, 0, 1, 0, 0, 0, 1, 1]
+
+    ciphertext = sdes_encrypt(plaintext, key)
+    print(f"Ciphertext: {''.join(map(str, ciphertext))}")
+
+    decrypted = sdes_decrypt(ciphertext, key)
+    print(f"Decrypted: {''.join(map(str, decrypted))}")

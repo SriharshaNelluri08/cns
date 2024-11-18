@@ -1,0 +1,19 @@
+def Encryption(plain_text,key):
+    cipher_text=""
+    for char in plain_text:
+        if char.isalpha():
+            start=ord("A") if char.isupper() else ord('a')
+            cipher_text+=chr((ord(char)-start+key)%26+start)
+    return cipher_text
+def Decryption(cipher_text,key):
+    plain_text=""
+    for char in cipher_text:
+        if char.isalpha():
+            start=ord("A") if char.isupper() else ord('a')
+            cipher_text+=chr((ord(char)-start-key)%26+start)
+    return plain_text
+plain_text=str(input())
+key=int(input())
+print(Encryption(plain_text,key))
+cp=Encryption(plain_text,key)
+print(Decryption(cp,key))
